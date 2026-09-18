@@ -1,22 +1,28 @@
 # Rivage
 
-Comparateur de kayaks de pêche à pédales en français.
+Le projet de Franck : un accompagnement en français pour choisir et équiper un kayak de pêche à pédales.
 
 **Ouvrir : https://lesdudus.github.io/rivage/**
 
-32 références, 11 marques ou marques de distribution. Filtres, comparaison de deux à quatre kayaks, favoris, budget équipé et questionnaire. Les informations inconnues ne valident jamais un critère obligatoire.
+Un accueil personnel, quatre courtes étapes sans réponses imposées, puis un bilan : sorties, transport, stockage, confort, charge et enveloppe totale. Chaque réponse peut rester inconnue ou être modifiée. Les conseils sont liés aux réponses, sans chatbot ni profil inventé.
+
+Le projet conserve les pistes mises de côté et le kayak retenu, avec ses vérifications restantes. Le budget partagé distingue le pack, le matériel déjà possédé, le chariot optionnel, le transport et la réserve.
+
+Le catalogue reste accessible : 32 références, 11 marques ou marques de distribution, filtres, favoris et comparaison de deux à quatre kayaks. Une information inconnue ne valide jamais un critère obligatoire ; aucun modèle confirmé reste une réponse possible.
 
 ## Données
 
-Relevés commerciaux du 18 septembre 2026, pas de prix ni de stock en temps réel. Sources, versions, réserves et crédits photo dans chaque fiche. Aucun score inventé de stabilité ou de sécurité. Les capacités ne sont pas assimilées à une charge utile confirmée. Les budgets sont des estimations, pas des devis ni une liste réglementaire complète.
+Relevés commerciaux du 18 septembre 2026, pas de prix ni de stock en temps réel. Sources, versions, réserves et crédits photo dans chaque fiche. Aucun score inventé de stabilité ou de sécurité. Les capacités ne sont pas assimilées à une charge utile confirmée. Les budgets sont des estimations, pas des devis ni une liste réglementaire complète. Une saisie de transport ou un équipement déjà possédé ne prouve pas sa compatibilité.
 
 ## Vie privée
 
-Pas de compte ni de télémétrie ajoutée par Rivage. Favoris, sélection et budget restent dans votre navigateur, sans synchronisation entre personnes. GitHub Pages héberge le site ; les photos sont chargées depuis les serveurs des vendeurs ou marques, qui reçoivent donc ces requêtes. Les liens de sources ouvrent des sites externes.
+Pas de compte ni de télémétrie ajoutée par Rivage. Les réponses personnelles, favoris, sélection et budget restent dans le navigateur, sans synchronisation entre appareils ou visiteurs. Ils sont modifiables et effaçables depuis le projet ou le carnet. Aucune réponse personnelle n’est incluse dans ce dépôt. Les anciens profils préremplis ne sont pas repris comme des faits sur Franck.
+
+GitHub Pages héberge le site ; les photos sont chargées depuis les serveurs des vendeurs ou marques, qui reçoivent donc ces requêtes. Les liens de sources ouvrent des sites externes.
 
 ## Photos et licences
 
-Ce dépôt n'inclut pas de copies des photographies commerciales. Elles sont référencées sur leurs hébergements d'origine, avec attribution. Leur disponibilité dépend de ces sources. Droits réservés aux ayants droit ; aucun droit de réutilisation n'est accordé par ce dépôt. Icônes Lucide : licence ISC fournie dans assets/lucide-license.txt.
+Ce dépôt n'inclut pas de copies des photographies commerciales. Elles sont référencées sur leurs hébergements d'origine, avec attribution. Leur disponibilité dépend de ces sources ; une intégration bloquée est remplacée par un lien vers le vendeur. Droits réservés aux ayants droit ; aucun droit de réutilisation n'est accordé par ce dépôt. Icônes Lucide : licence ISC fournie dans assets/lucide-license.txt.
 
 ## Hébergement
 

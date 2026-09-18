@@ -10,7 +10,7 @@ document.addEventListener('error', event => {
   link.setAttribute('aria-label', image.alt + ' : voir la photo chez le vendeur');
   image.replaceWith(link);
 }, true);
-import { matches, budgetFor, recommendation, restore, equipment, knownNumber } from './logic.js';
+import { matches, budgetFor, recommendation, restore, equipment, knownNumber, emptyProfile, normalizeProfile, projectAdvice } from './logic.js';
 
 const main = document.querySelector('#main');
 const dialog = document.querySelector('#detail');
@@ -24,8 +24,8 @@ const yesNo = value => value === true ? 'Oui, annoncé' : value === false ? 'Non
 const link = (url, label) => `<a href="${escape(url)}" target="_blank" rel="noopener noreferrer">${escape(label)} ${icon('arrow-up-right')}</a>`;
 const icons = () => window.lucide?.createIcons();
 let models = [], selected = [], favorites = [], favoritesOnly = false, differences = false;
-let filters = {}, sort = 'price', view = 'catalogue', budgetId = 'moken10', estimates = {}, owned = [], shippingQuotes = {}, extras = 250;
-const defaultProfile = { budget: 3000, environment: 'fresh', transport: 'roof', maxWeight: 35, maxLength: 420, bodyWeight: 80, gear: 20, seats: 1, priority: 'price' };
+let filters = {}, sort = 'price', view = 'projet', budgetId = 'moken10', estimates = {}, owned = [], excluded = [], shippingQuotes = {}, extras = 250, budgetChosen = false;
+const defaultProfile = emptyProfile;
 let profile = { ...defaultProfile };
 let projectResult = null, toastTimer;
 const byId = id => models.find(model => model.id === id);
@@ -108,42 +108,129 @@ function comparisonRows(products) {
 function budgetView() {
   const model = byId(budgetId) || models[0];
   budgetId = model.id;
-  const cost = budgetFor(model, estimates, owned);
-  main.innerHTML = `${header('Le budget équipé.', 'Au-delà du prix du kayak', 'Un panier de départ, pas un devis. Les accessoires sont des provisions modifiables, sans promesse de compatibilité.')}<div class="split"><div><label>Kayak et pack<select id="budget-model">${selectOptions(models.map(item => [item.id, `${item.brand} · ${item.name} · ${money(item.price)}`]), budgetId)}</select></label><p class="muted"><small>${escape(model.version)}</small></p><table class="budget-table"><thead><tr><th scope="col">Équipement</th><th scope="col">Déjà possédé</th><th scope="col">Provision (€)</th></tr></thead><tbody>${cost.lines.map(item => `<tr><td><strong>${item.label}</strong><br><small class="${item.included ? 'included' : ''}">${item.included ? 'Inclus : aucun ajout' : item.unknown ? 'Inclusion à confirmer' : 'Non inclus dans le pack'}</small></td><td>${item.included ? icon('check') : `<label class="check"><input type="checkbox" data-owned="${item.id}" ${item.owned ? 'checked' : ''}>Possédé</label>`}</td><td><input type="number" aria-label="Provision ${item.label}" min="0" max="10000" step="1" data-estimate="${item.id}" value="${item.included || item.owned ? 0 : estimates[item.id] ?? item.estimate}" ${item.included || item.owned ? 'disabled' : ''}></td></tr>`).join('')}</tbody></table><div class="form-section form-grid"><label>Livraison ou retrait (€)<input id="shipping-quote" type="number" min="0" max="5000" placeholder="${knownNumber(model.shipping) ? number(model.shipping) : 'Devis nécessaire'}" value="${shippingQuotes[budgetId] ?? ''}"><span class="field-hint">Valeur saisie = votre hypothèse. Vide = tarif de la source, s’il existe.</span></label><label>Autres frais / réserve (€)<input id="extras" type="number" min="0" max="20000" value="${extras}"><span class="field-hint">Vêtements adaptés à l’eau, repérage lumineux, étanchéité, matériel de pêche, transport…</span></label></div><div class="notice">${icon('truck')}<p>${escape(model.shippingNote || 'Livraison et retrait : tarif et conditions à confirmer auprès du vendeur.')}${model.shippingSource ? `<br>${link(model.shippingSource, 'Conditions de transport')}` : ''}</p></div><p><small>Aide à la flottabilité et autres équipements : vérifier taille, normes, usage et compatibilité. La réserve ne constitue pas une liste réglementaire complète. Un total bas ne prouve pas que le kayak est disponible.</small></p></div><aside class="budget-preview" id="budget-summary"></aside></div>`;
-  document.querySelector('#budget-model').addEventListener('change', event => { budgetId = event.target.value; saveBudget(); budgetView(); icons(); });
-  main.querySelectorAll('[data-owned]').forEach(input => input.addEventListener('change', () => { owned = input.checked ? [...owned, input.dataset.owned] : owned.filter(id => id !== input.dataset.owned); saveBudget(); budgetView(); icons(); }));
+  const cost = currentBudget(model);
+  const rows = cost.lines.map(item => `<tr><td><strong>${item.label}</strong><br><small class="${item.included ? 'included' : ''}">${item.included ? 'Inclus : aucun ajout' : item.owned ? 'Déjà possédé : compatibilité à vérifier' : item.omitted ? 'Non prévu dans ce budget' : item.unknown ? 'Inclusion à confirmer' : 'Non inclus dans le pack'}</small>${item.optional ? `<label class="optional-switch"><input type="checkbox" data-optional="${item.id}" ${item.omitted ? '' : 'checked'} ${item.included || item.owned ? 'disabled' : ''}>Prévoir cette option</label>` : ''}</td><td>${item.included ? icon('check') : `<label class="check"><input type="checkbox" data-owned="${item.id}" ${item.owned ? 'checked' : ''}>Possédé</label>`}</td><td><input type="number" aria-label="Provision ${item.label}" min="0" max="10000" step="1" data-estimate="${item.id}" value="${item.included || item.owned || item.omitted ? 0 : estimates[item.id] ?? item.estimate}" ${item.included || item.owned || item.omitted ? 'disabled' : ''}></td></tr>`);
+  const baseRows = rows.filter((row, index) => !cost.lines[index].optional).join('');
+  const optionalRows = rows.filter((row, index) => cost.lines[index].optional).join('');
+  main.innerHTML = `${header('Préparons ton équipement.', 'Le budget équipé · Rien à compter deux fois', 'On distingue le pack, le matériel que tu as déjà et les achats à prévoir. Les provisions sont modifiables ; leur compatibilité reste à confirmer.')}<div class="split"><div><label>Kayak et pack à chiffrer<select id="budget-model">${selectOptions(models.map(item => [item.id, `${item.brand} · ${item.name} · ${money(item.price)}`]), budgetId)}</select></label><p class="muted"><small>${escape(model.version)}</small></p><div class="budget-choice">${budgetChosen ? `${icon('bookmark-check')}Cette piste est dans ton projet. <a href="#projet">Faire le point</a>` : `<span>Simulation uniquement : aucun kayak retenu.</span><button data-action="choose" data-id="${model.id}">${icon('bookmark-plus')}Retenir ce kayak</button>`}</div><table class="budget-table"><thead><tr><th scope="col">Équipement</th><th scope="col">Déjà possédé</th><th scope="col">Provision (€)</th></tr></thead><tbody><tr class="equipment-group"><th colspan="3">La base à prévoir ou à vérifier</th></tr>${baseRows}<tr class="equipment-group"><th colspan="3">En option, selon la mise à l’eau</th></tr>${optionalRows}</tbody></table><div class="form-section form-grid"><label>Livraison ou retrait (€)<input id="shipping-quote" type="number" min="0" max="5000" placeholder="${knownNumber(model.shipping) ? number(model.shipping) : 'Devis nécessaire'}" value="${shippingQuotes[budgetId] ?? ''}"><span class="field-hint">Valeur saisie = ton hypothèse, à confirmer. Vide = tarif de la source, s’il existe.</span></label><label>Autres frais / réserve (€)<input id="extras" type="number" min="0" max="20000" value="${extras}"><span class="field-hint">Vêtements adaptés à l’eau, repérage lumineux, étanchéité, matériel de pêche, transport…</span></label></div><div class="notice">${icon('truck')}<p>${escape(model.shippingNote || 'Livraison et retrait : tarif et conditions à confirmer auprès du vendeur.')}${model.shippingSource ? `<br>${link(model.shippingSource, 'Conditions de transport')}` : ''}</p></div><p><small>Pour l’aide à la flottabilité et les autres équipements, vérifie taille, normes, état et compatibilité avec le vendeur. Il ne s’agit ni d’un devis ni d’une liste réglementaire complète. Un total bas ne prouve pas la disponibilité.</small></p></div><aside class="budget-preview" id="budget-summary"></aside></div>`;
+  document.querySelector('#budget-model').addEventListener('change', event => { budgetId = event.target.value; saveBudget(); budgetView(); icons(); document.querySelector('#budget-model').focus(); });
+  main.querySelectorAll('[data-owned]').forEach(input => input.addEventListener('change', () => { owned = input.checked ? [...new Set([...owned, input.dataset.owned])] : owned.filter(id => id !== input.dataset.owned); saveBudget(); budgetView(); icons(); document.querySelector(`[data-owned="${input.dataset.owned}"]`).focus(); }));
+  main.querySelectorAll('[data-optional]').forEach(input => input.addEventListener('change', () => { excluded = input.checked ? excluded.filter(id => id !== input.dataset.optional) : [...new Set([...excluded, input.dataset.optional])]; saveBudget(); budgetView(); icons(); document.querySelector(`[data-optional="${input.dataset.optional}"]`).focus(); }));
   main.querySelectorAll('[data-estimate]').forEach(input => input.addEventListener('input', () => { estimates[input.dataset.estimate] = Math.min(10000, Math.max(0, Number(input.value) || 0)); saveBudget(); budgetSummary(); }));
   document.querySelector('#shipping-quote').addEventListener('input', event => { if (event.target.value === '') delete shippingQuotes[budgetId]; else shippingQuotes[budgetId] = Math.min(5000, Math.max(0, Number(event.target.value) || 0)); saveBudget(); budgetSummary(); });
   document.querySelector('#extras').addEventListener('input', event => { extras = Math.min(20000, Math.max(0, Number(event.target.value) || 0)); saveBudget(); budgetSummary(); });
   budgetSummary();
 }
-function saveBudget() { save('budget', { budgetId, estimates, owned, shippingQuotes, extras }); }
+function saveBudget() { save('budget', { budgetId, estimates, owned, excluded, shippingQuotes, extras, budgetChosen }); projectResult = null; }
 function budgetSummary() {
-  const model = byId(budgetId), manualShipping = Object.hasOwn(shippingQuotes, budgetId);
-  const adjusted = { ...model, shipping: manualShipping ? shippingQuotes[budgetId] : model.shipping };
-  const cost = budgetFor(adjusted, estimates, owned);
-  document.querySelector('#budget-summary').innerHTML = `<p class="eyebrow">${escape(model.brand)}</p><h2>${escape(model.name)}</h2>${photo(model, '', false)}<span class="status ${model.status}">${statusNames[model.status]}</span><dl class="total-lines"><div><dt>Pack TTC relevé</dt><dd>${money(model.price)}</dd></div><div><dt>Équipement à ajouter</dt><dd>${money(cost.accessories)}</dd></div><div><dt>${manualShipping ? 'Transport saisi' : 'Transport source'}</dt><dd>${cost.shippingUnknown ? 'Non chiffré' : money(adjusted.shipping)}</dd></div><div><dt>Autres / réserve</dt><dd>${money(extras)}</dd></div></dl><p class="eyebrow">${cost.shippingUnknown ? 'Sous-total · transport non chiffré' : 'Total estimatif'}</p><div class="amount" id="budget-total">${cost.total === null ? 'Prix manquant' : money(cost.total + extras)}</div><p><small>${cost.shippingUnknown ? 'Les frais de transport inconnus ne sont pas inclus dans ce sous-total.' : 'Transport inclus selon la source ou votre saisie.'} ${cost.lines.some(item => item.unknown) ? 'Une provision reste ajoutée pour chaque inclusion non confirmée.' : ''}</small></p><div class="inline-actions"><button data-action="detail" data-id="${model.id}">${icon('file-text')}Vérifier le pack</button></div><small>Offre relevée le ${date(model.checked)}.<br>${link(model.offerUrl, model.seller)}</small>`;
+  const model = byId(budgetId), cost = currentBudget(model);
+  document.querySelector('#budget-summary').innerHTML = `<p class="eyebrow">${escape(model.brand)}</p><h2>${escape(model.name)}</h2>${photo(model, '', false)}<span class="status ${model.status}">${statusNames[model.status]}</span><dl class="total-lines"><div><dt>Pack TTC relevé</dt><dd>${money(model.price)}</dd></div><div><dt>Équipement à ajouter</dt><dd>${money(cost.accessories)}</dd></div><div><dt>${cost.manualShipping ? 'Transport saisi (hypothèse)' : 'Transport source'}</dt><dd>${cost.shippingUnknown ? 'Non chiffré' : money(cost.adjusted.shipping)}</dd></div><div><dt>Autres / réserve</dt><dd>${money(extras)}</dd></div></dl><p class="eyebrow">${cost.shippingUnknown ? 'Sous-total · transport non chiffré' : 'Total estimatif'}</p><div class="amount" id="budget-total">${cost.total === null ? 'Prix manquant' : money(cost.total)}</div><p><small>${cost.shippingUnknown ? 'Les frais de transport inconnus ne sont pas inclus dans ce sous-total.' : cost.manualShipping ? 'Ton montant de transport reste à confirmer avec le vendeur.' : 'Transport inclus selon la source.'} ${cost.lines.some(item => item.unknown) ? 'Une provision reste ajoutée pour chaque inclusion non confirmée.' : ''}</small></p><div class="inline-actions"><button data-action="detail" data-id="${model.id}">${icon('file-text')}Vérifier le pack</button></div><small>Offre relevée le ${date(model.checked)}.<br>${link(model.offerUrl, model.seller)}</small>`;
   icons();
 }
 function projectView() {
-  main.innerHTML = `${header('Votre prochain kayak.', 'Mon projet · Décision guidée', 'Des contraintes concrètes avant une préférence de marque. Les réponses ne constituent pas une validation de sécurité.')}<div class="split"><form id="project"><div class="form-grid"><label>Budget total maximum (€)<input required type="number" name="budget" min="1" max="30000" step="1" value="${profile.budget}"></label><label>Milieu principal<select name="environment">${selectOptions([['fresh', 'Lac / eau douce calme'], ['sea', 'Mer / littoral']], profile.environment)}</select></label></div><fieldset class="form-section"><legend>À terre</legend><div class="form-grid"><label>Transport<select name="transport">${selectOptions([['roof', 'Sur le toit du véhicule'], ['trailer', 'Remorque'], ['nearby', 'Stockage près de l’eau']], profile.transport)}</select></label><label>Limite de manutention de coque (kg)<input required type="number" name="maxWeight" min="1" max="150" step="0.1" value="${profile.maxWeight}"></label><label>Longueur de stockage disponible (cm)<input required type="number" name="maxLength" min="100" max="1000" value="${profile.maxLength}"></label><label>Places<select name="seats">${selectOptions([[1, 'Une personne'], [2, 'Deux personnes']], profile.seats)}</select></label></div><p>Le poids hors siège et pédalier n’est pas le poids à mettre à l’eau. Un modèle démontable nécessite des dimensions de sections confirmées.</p></fieldset><fieldset class="form-section"><legend>À bord</legend><div class="form-grid"><label>Votre poids équipé (kg)<input required type="number" name="bodyWeight" min="20" max="250" step="0.1" value="${profile.bodyWeight}"></label><label>Matériel + autre passager (kg)<input required type="number" name="gear" min="0" max="350" step="0.1" value="${profile.gear}"></label><label>Priorité<select name="priority">${selectOptions([['price', 'Budget le plus bas'], ['light', 'Coque la plus légère'], ['reverse', 'Marche arrière obligatoire']], profile.priority)}</select></label></div></fieldset><div class="inline-actions"><button type="submit" class="primary">${icon('compass')}Examiner les options</button></div></form><aside class="project-intro"><p class="eyebrow">Le bon ordre des questions</p><h2>Le porter.<br>Le ranger.<br>Puis le choisir.</h2><ul><li>Un kayak trop lourd à charger risque de rester au garage.</li><li>La capacité annoncée n’est pas nécessairement une charge utile.</li><li>La stabilité se vérifie en essai, avec votre gabarit et votre matériel.</li></ul><p><small>Calcul : pack + provisions de départ non incluses + transport documenté + réserve de 250 €. Les montants personnalisés de la vue Budget ne modifient pas ce calcul. Les inconnues restent à vérifier.</small></p></aside></div><section id="project-results" class="results" ${projectResult ? '' : 'hidden'}></section>`;
-  document.querySelector('#project').addEventListener('submit', event => {
-    event.preventDefault();
-    const values = Object.fromEntries(new FormData(event.currentTarget));
-    profile = { ...values, ...Object.fromEntries(['budget', 'maxWeight', 'maxLength', 'bodyWeight', 'gear', 'seats'].map(key => [key, Number(values[key])])) };
-    save('profile', profile);
-    projectResult = recommendation(models, { ...profile, budget: Math.max(0, profile.budget - 250), load: profile.bodyWeight + profile.gear });
-    projectResults();
-    document.querySelector('#project-results').scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
+  const stages = ['Tes sorties', 'À terre', 'À bord', 'Ton budget', 'Le point ensemble'];
+  const titles = ['Où aimerais-tu aller pêcher ?', 'Comment se passera la mise à l’eau ?', 'Faisons de la place au confort.', 'Gardons une place pour l’équipement.'];
+  const introductions = ['Un lac tranquille, le littoral, une rivière… Le point de départ, ce sont les sorties qui te font envie.', 'Le bon kayak, c’est aussi celui que tu peux transporter et ranger sans difficulté.', 'Le siège, les jambes et la charge comptent autant que la fiche technique. Un essai restera précieux.', 'L’enveloppe comprend le kayak, ce qui manque pour le préparer et les frais de transport. Pas seulement le prix affiché.'];
+  const groups = [['environment', 'experience', 'fishing'], ['transport', 'lifting', 'maxWeight', 'maxLength'], ['seats', 'bodyWeight', 'gear', 'comfort', 'priority'], ['budget']];
+  main.innerHTML = `${header(profile.step === 0 ? 'Bonjour Franck.' : 'On avance à ton rythme.', 'Ton kayak de pêche · Préparons-le ensemble', profile.step === 0 ? 'On prépare ton kayak ? Commençons par les sorties que tu aimerais faire.' : 'Rien n’oblige à tout décider aujourd’hui. On peut revenir sur chaque choix.')}<nav class="project-steps" aria-label="Étapes de ton projet">${stages.map((label, index) => `<button data-action="project-step" data-id="${index}" ${profile.step === index ? 'aria-current="step"' : ''}><span>${index + 1}</span>${label}</button>`).join('')}</nav><div class="project-layout"><div>${profile.step < 4 ? `<form id="project" class="project-questions"><p class="eyebrow">${profile.step + 1} sur 4 · ${stages[profile.step]}</p><h2 id="question-title" tabindex="-1">${titles[profile.step]}</h2><p class="question-intro">${introductions[profile.step]}</p><div class="form-grid">${groups[profile.step].map(projectField).join('')}</div>${profile.step === 3 ? `<fieldset class="form-section"><legend>Ce que tu as déjà</legend><p>À conserver si la taille, l’état et la compatibilité conviennent au kayak choisi.</p><div class="owned-grid">${equipment.map(item => `<label class="check"><input data-project-owned="${item.id}" type="checkbox" ${owned.includes(item.id) ? 'checked' : ''}>${item.label}</label>`).join('')}</div></fieldset><div class="notice">${icon('wallet')}<p>Une réserve de ${money(extras)} est prévue pour les autres frais. On pourra l’ajuster dans le budget équipé. Ce n’est pas un devis ni une liste de sécurité complète.</p></div>` : ''}<p class="uncertain-note">Un point encore flou ? Tu peux le laisser à préciser. Il ne sera pas considéré comme vérifié.</p><div class="project-actions">${profile.step ? `<button type="button" data-action="project-step" data-id="${profile.step - 1}">${icon('arrow-left')}Revenir</button>` : `<a href="#catalogue">Je regarde les kayaks d’abord</a>`}<button type="submit" class="primary">${profile.step === 3 ? 'Faire le point' : 'On continue'}${icon('arrow-right')}</button></div></form>` : `<section class="project-review"><p class="eyebrow">Tes repères, sans raccourcis</p><h2 id="question-title" tabindex="-1">Le point, tranquillement.</h2><p>On a séparé tes envies, tes contraintes et ce qui demande encore une réponse. Un kayak retenu ici reste une piste, pas un achat validé.</p><div id="personal-advice"></div><div class="inline-actions"><a class="button-link primary" href="#catalogue">${icon('search')}Explorer les kayaks</a><a class="button-link" href="#budget">${icon('wallet')}Préparer l’équipement</a></div><section id="project-shortlist"></section></section>`}</div><aside id="project-summary" class="project-summary" aria-label="Le projet de Franck"></aside></div>${profile.step === 4 ? '<section id="project-results" class="results"></section>' : ''}`;
+  const form = document.querySelector('#project');
+  form?.addEventListener('input', event => {
+    const field = event.target;
+    if (field.dataset.projectOwned) {
+      owned = field.checked ? [...new Set([...owned, field.dataset.projectOwned])] : owned.filter(id => id !== field.dataset.projectOwned);
+      saveBudget();
+    } else if (field.name) {
+      const value = field.value === '' ? null : field.type === 'number' || field.name === 'seats' ? Number(field.value) : field.value;
+      profile = normalizeProfile({ ...profile, [field.name]: value });
+      save('profile', profile);
+      projectResult = null;
+    }
+    projectSummary();
   });
-  if (projectResult) projectResults();
+  form?.addEventListener('submit', event => { event.preventDefault(); setProjectStep(profile.step + 1); });
+  projectSummary();
+  if (profile.step === 4) {
+    const advice = projectAdvice(profile);
+    document.querySelector('#personal-advice').innerHTML = advice.length ? `<ul class="advice-list">${advice.map(text => `<li>${icon('compass')}<span>${escape(text)}</span></li>`).join('')}</ul>` : '<p class="muted">Tes envies restent ouvertes. Aucun poids, budget ou niveau d’expérience n’a été choisi à ta place.</p>';
+    projectShortlist();
+    projectResults();
+  }
+  icons();
+  const steps = document.querySelector('.project-steps'), current = steps.querySelector('[aria-current="step"]');
+  steps.scrollLeft = current.offsetLeft - steps.offsetLeft - (steps.clientWidth - current.clientWidth) / 2;
+}
+
+const projectQuestions = {
+  environment: { label: 'Ton milieu de pêche', options: [['fresh', 'Lac / eau douce calme'], ['sea', 'Mer / littoral'], ['river', 'Rivière']], hint: 'Courant, vent et règles locales changent ce qu’il faut vérifier.' },
+  experience: { label: 'Ton expérience du kayak', options: [['new', 'Je découvre'], ['some', 'J’en ai déjà fait quelques fois'], ['regular', 'Je pratique régulièrement']] },
+  fishing: { label: 'Le genre de sortie qui te tente', options: [['roam', 'Explorer et changer de poste'], ['spot', 'Pêcher tranquillement sur un poste'], ['both', 'Un peu des deux']] },
+  transport: { label: 'Comment emmènerais-tu le kayak ?', options: [['roof', 'Sur le toit de la voiture'], ['trailer', 'Sur une remorque'], ['nearby', 'Il resterait près de l’eau']] },
+  lifting: { label: 'Pour le charger et le déplacer', options: [['solo', 'Je serais seul'], ['help', 'Quelqu’un pourrait m’aider']] },
+  maxWeight: { label: 'Ta limite de portage de coque (kg)', min: 1, max: 150, hint: 'Coque sans siège ni pédalier. Si tu n’as pas essayé, ne devine pas une limite.' },
+  maxLength: { label: 'Longueur disponible pour le ranger (cm)', min: 100, max: 1000, hint: 'Mesure aussi le passage de la porte. Le kayak ne se plie pas forcément.' },
+  seats: { label: 'À combien voudrais-tu partir ?', options: [[1, 'Seul à bord'], [2, 'À deux dans le kayak']] },
+  bodyWeight: { label: 'Ton poids avec ta tenue de pêche (kg)', min: 20, max: 250, hint: 'Il sert à vérifier la limite du siège. Ta réponse reste dans ce navigateur.' },
+  gear: { label: 'Matériel et autre passager éventuel (kg)', min: 0, max: 350, hint: 'Eau, affaires, équipement et éventuel passager, sans compter ton propre poids.' },
+  comfort: { label: 'Ce que tu veux surtout essayer', options: [['adjustable', 'Les réglages et l’appui du siège'], ['space', 'La place pour les jambes'], ['try', 'L’ensemble, avant de décider']] },
+  priority: { label: 'Ta priorité entre les modèles', options: [['price', 'Le budget le plus bas'], ['light', 'Une coque plus facile à porter'], ['reverse', 'La marche arrière, indispensable'], ['comfort', 'Le confort, à vérifier en essai']] },
+  budget: { label: 'Ton enveloppe totale maximum (€)', min: 1, max: 30000, hint: 'Kayak, équipement manquant, transport et réserve compris. Aucun montant n’est imposé.' }
+};
+function projectField(field) {
+  const question = projectQuestions[field];
+  return `<label>${question.label}${question.options ? `<select name="${field}">${selectOptions([['', 'Je ne sais pas encore'], ...question.options], profile[field] ?? '')}</select>` : `<input name="${field}" type="number" min="${question.min}" max="${question.max}" step="${field === 'budget' || field === 'maxLength' ? 1 : 0.1}" placeholder="À préciser" value="${profile[field] ?? ''}">`}${question.hint ? `<span class="field-hint">${question.hint}</span>` : ''}</label>`;
+}
+function setProjectStep(step) {
+  if (document.querySelector('#project') && !document.querySelector('#project').reportValidity()) return;
+  profile = normalizeProfile({ ...profile, step: Number(step) });
+  save('profile', profile);
+  projectView();
+  document.querySelector('#question-title')?.focus();
+}
+function profileAnswer(field) {
+  const value = profile[field];
+  if (value === null || value === '') return 'À préciser';
+  const options = projectQuestions[field].options;
+  if (options) return options.find(([option]) => option === value)?.[1] || 'À préciser';
+  return field === 'budget' ? money(value) : number(value, field === 'maxLength' ? 'cm' : 'kg');
+}
+function currentBudget(model = byId(budgetId)) {
+  const manualShipping = Object.hasOwn(shippingQuotes, model.id);
+  const adjusted = { ...model, shipping: manualShipping ? shippingQuotes[model.id] : model.shipping };
+  const cost = budgetFor(adjusted, estimates, owned, excluded);
+  return { ...cost, total: cost.total === null ? null : cost.total + extras, adjusted, manualShipping };
+}
+function projectSummary() {
+  const target = document.querySelector('#project-summary');
+  if (!target) return;
+  const model = byId(budgetId), cost = currentBudget(model);
+  target.innerHTML = `<p class="eyebrow">Ton carnet personnel</p><h2>Le projet de Franck</h2><dl class="project-facts">${[['environment', 'Sorties', 0], ['experience', 'Expérience', 0], ['fishing', 'Pêche', 0], ['transport', 'Transport', 1], ['lifting', 'Chargement', 1], ['maxWeight', 'Portage', 1], ['maxLength', 'Rangement', 1], ['seats', 'Places', 2], ['bodyWeight', 'Ton poids équipé', 2], ['gear', 'Autre charge', 2], ['comfort', 'Confort', 2], ['priority', 'Priorité', 2], ['budget', 'Enveloppe', 3]].map(([field, label, step]) => `<div><dt>${label}</dt><dd>${escape(profileAnswer(field))}<button class="edit-answer" data-action="project-step" data-id="${step}" aria-label="Modifier : ${label}" title="Modifier cette réponse">${icon('pencil')}</button></dd></div>`).join('')}</dl><div class="project-kit"><h3>${budgetChosen ? escape(model.name) : 'Le kayak reste à choisir'}</h3>${budgetChosen ? `${photo(model, 'summary-photo', false)}<p><strong>${cost.total === null ? 'Prix manquant' : money(cost.total)}</strong> <small>${cost.shippingUnknown ? '+ transport à chiffrer' : 'estimés'}</small></p><small>Pack + équipement manquant + transport chiffré + ${money(extras)} de réserve.</small>${knownNumber(profile.budget) && knownNumber(cost.total) && cost.total > profile.budget ? `<p class="budget-over">Au-dessus de ton enveloppe de ${money(cost.total - profile.budget)}.</p>` : ''}<p><a href="#budget">Revoir ce budget ${icon('arrow-up-right')}</a></p><button class="text-button" data-action="unchoose">${icon('x')}Retirer ce kayak du projet</button>` : '<p>Un favori permet de garder une piste sans prendre de décision.</p>'}<p><small>Déjà possédé : ${owned.length ? equipment.filter(item => owned.includes(item.id)).map(item => item.label).join(', ') : 'rien renseigné'}.</small></p><p><small>En option : chariot ${excluded.includes('cart') ? 'non prévu' : 'provisionné'}. Compatibilité à confirmer pour le matériel conservé.</small></p></div><p class="privacy-note">${icon('lock-keyhole')}Tes réponses restent sur cet appareil. Elles ne sont ni publiées ni partagées avec les visiteurs du site.</p><button data-action="clear-local" class="text-button">${icon('trash-2')}Effacer mon projet</button>`;
+  icons();
+}
+function projectShortlist() {
+  const target = document.querySelector('#project-shortlist');
+  if (!target) return;
+  const ids = [...new Set([...favorites, ...selected, ...(budgetChosen ? [budgetId] : [])])];
+  target.innerHTML = `<h3>Tes kayaks à regarder de plus près</h3>${ids.length ? `<div class="shortlist">${ids.map(id => { const model = byId(id); return `<article class="shortlist-item">${photo(model, 'shortlist-photo', false)}<div><small>${escape(model.brand)}</small><h4>${escape(model.name)}</h4><small>${money(model.price)} · pack relevé</small></div><div class="shortlist-actions"><button class="icon" data-action="detail" data-id="${id}" aria-label="Examiner ${escape(model.name)}" title="Examiner la fiche">${icon('file-text')}</button><button class="icon" data-action="choose" data-id="${id}" aria-label="Retenir ${escape(model.name)} pour le projet" title="Retenir pour le projet" aria-pressed="${budgetChosen && budgetId === id}">${icon('check')}</button></div></article>`; }).join('')}</div>` : '<p class="muted">Aucune piste mise de côté pour le moment. On peut commencer par comparer deux kayaks qui te plaisent.</p>'}`;
+  if (budgetChosen) {
+    const model = byId(budgetId), cost = currentBudget(model);
+    const assessment = examineModels([{ ...cost.adjusted, shippingEstimated: cost.manualShipping }]);
+    const match = [...assessment.confirmed, ...assessment.toVerify][0];
+    target.insertAdjacentHTML('beforeend', `<section class="chosen-checks"><h3>Avant de retenir ${escape(model.name)}</h3>${match ? `<p>Les critères chiffrés renseignés ne l’excluent pas. Il reste à vérifier :</p><ul>${[...match.missing, 'Un essai avec ta tenue et ton matériel, puis un devis pour cette version exacte'].map(text => `<li>${escape(text)}</li>`).join('')}</ul>` : `<p class="budget-over">${knownNumber(profile.budget) ? 'Cette piste ne passe pas les contraintes renseignées. Revois ensemble le budget, le poids, le stockage, les places et la disponibilité avant de la retenir.' : 'Ton enveloppe manque encore : on ne peut pas vérifier ce choix.'}</p>`}<p><small>Relevé du ${date(model.checked)} · ${escape(model.version)}. ${link(model.offerUrl, 'Demander confirmation au vendeur')}</small></p></section>`);
+  }
+  icons();
+}
+function examineModels(candidates) {
+  return recommendation(candidates, { ...profile, requireComplete: true, budget: knownNumber(profile.budget) ? Math.max(0, profile.budget - extras) : null, load: knownNumber(profile.bodyWeight) && knownNumber(profile.gear) ? profile.bodyWeight + profile.gear : null }, estimates, owned, excluded);
 }
 function projectResults() {
   const target = document.querySelector('#project-results');
+  if (!target) return;
   target.hidden = false;
+  const candidates = models.map(model => Object.hasOwn(shippingQuotes, model.id) ? { ...model, shipping: shippingQuotes[model.id], shippingEstimated: true } : model);
+  projectResult = examineModels(candidates);
   const { confirmed, toVerify } = projectResult;
-  const cards = items => `<div class="grid">${items.map(item => `<article class="result">${photo(item.model, '', false)}<p class="eyebrow">${escape(item.model.brand)}</p><h3>${escape(item.model.name)}</h3><p><strong>${item.budget.total === null ? 'Prix incomplet' : money(item.budget.total + 250)}</strong> <small>${item.budget.shippingUnknown ? '+ transport à chiffrer' : 'estimés, réserve comprise'}</small></p><ul>${item.reasons.map(reason => `<li>${escape(reason)}</li>`).join('')}</ul>${item.missing.length ? `<p class="eyebrow">Vérifications bloquantes</p><ul class="checks">${item.missing.map(reason => `<li>${escape(reason)}</li>`).join('')}</ul>` : ''}<p class="tradeoff">${escape(item.model.cautions)}</p><div class="inline-actions">${selectionButton(item.model)}<button data-action="detail" data-id="${item.model.id}" title="Ouvrir la fiche" aria-label="Fiche ${escape(item.model.name)}" class="icon">${icon('arrow-up-right')}</button></div></article>`).join('')}</div>`;
-  target.innerHTML = `<p class="eyebrow">Votre examen de compatibilité</p><h2>${confirmed.length ? `${confirmed.length} option${confirmed.length > 1 ? 's' : ''} compatible${confirmed.length > 1 ? 's' : ''} avec les données documentées` : 'Aucun modèle confirmé.'}</h2><div class="notice warning">${icon('clipboard-check')}<p>${confirmed.length ? 'Compatibilité sur les seuls critères saisis, à valider par un essai et un devis.' : 'Les données disponibles ne permettent pas de valider toutes vos contraintes. Aucun critère n’a été assoupli pour fabriquer un résultat.'} ${profile.environment === 'sea' ? 'En mer, la conformité et la distance autorisée nécessitent les documents de la version exacte.' : ''}</p></div>${confirmed.length ? cards(confirmed) : ''}${toVerify.length ? `<h3>Pistes à vérifier, pas des achats validés</h3><p class="muted">${toVerify.length} dossier${toVerify.length > 1 ? 's' : ''} sans incompatibilité chiffrée établie, mais avec des inconnues bloquantes.</p>${cards(toVerify)}` : `<p>Aucune piste dans ce périmètre. Réexaminez les contraintes de budget, de stockage ou de transport sans sacrifier votre sécurité.</p>`}`;
+  const cards = items => `<div class="grid">${items.map(item => `<article class="result">${photo(item.model, '', false)}<p class="eyebrow">${escape(item.model.brand)}</p><h3>${escape(item.model.name)}</h3><p><strong>${item.budget.total === null ? 'Prix incomplet' : money(item.budget.total + extras)}</strong> <small>${item.budget.shippingUnknown ? '+ transport à chiffrer' : 'estimés, réserve comprise'}</small></p><ul>${item.reasons.map(reason => `<li>${escape(reason)}</li>`).join('')}</ul>${item.missing.length ? `<p class="eyebrow">À confirmer avant de décider</p><ul class="checks">${item.missing.map(reason => `<li>${escape(reason)}</li>`).join('')}</ul>` : ''}<p class="tradeoff">${escape(item.model.cautions)}</p><div class="inline-actions">${selectionButton(item.model)}<button data-action="choose" data-id="${item.model.id}">${icon('bookmark-plus')}Retenir cette piste</button><button data-action="detail" data-id="${item.model.id}" title="Ouvrir la fiche" aria-label="Fiche ${escape(item.model.name)}" class="icon">${icon('arrow-up-right')}</button></div></article>`).join('')}</div>`;
+  target.innerHTML = `<p class="eyebrow">Ce que les données permettent de dire</p><h2>${confirmed.length ? `${confirmed.length} piste${confirmed.length > 1 ? 's' : ''} compatible${confirmed.length > 1 ? 's' : ''} avec les critères documentés` : 'Aucun modèle confirmé.'}</h2><div class="notice warning">${icon('clipboard-check')}<p>${confirmed.length ? 'On a une compatibilité sur les critères renseignés, pas une garantie de sécurité. Restent un essai et un devis.' : 'Il manque encore des réponses ou des preuves pour tout vérifier. Ce n’est pas une impasse : on peut préparer les bonnes questions pour le vendeur.'} ${profile.environment === 'sea' ? 'En mer, demandons les documents de la version exacte.' : ''}</p></div><p><small>Même panier que ton budget équipé : matériel possédé déduit, options respectées, ${money(extras)} de réserve. Les montants saisis restent des estimations.</small></p>${confirmed.length ? cards(confirmed) : ''}${toVerify.length ? `<h3>Pistes à examiner, sans validation d’achat</h3><p class="muted">Aucune incompatibilité chiffrée établie sur tes réponses, mais les points ci-dessous restent ouverts.</p>${cards(toVerify)}` : `<p>${knownNumber(profile.budget) ? 'Aucune piste dans cette enveloppe avec les contraintes connues. On peut revoir le projet sans assouplir une limite de sécurité.' : 'Ton enveloppe reste à préciser. On ne va pas en inventer une : le catalogue reste ouvert pour te faire une idée.'}</p><button data-action="project-step" data-id="3">${icon('wallet')}Revoir mon enveloppe</button>`}`;
   icons();
 }
 function notebook() {
@@ -159,7 +246,7 @@ function detail(id) {
 function render() {
   const requested = location.hash.slice(1);
   const anchors = ['definitions', 'securite', 'regles', 'achat', 'sources'];
-  view = anchors.includes(requested) ? 'carnet' : ['catalogue', 'comparatif', 'budget', 'projet', 'carnet'].includes(requested) ? requested : 'catalogue';
+  view = anchors.includes(requested) ? 'carnet' : ['catalogue', 'comparatif', 'budget', 'projet', 'carnet'].includes(requested) ? requested : 'projet';
   document.querySelectorAll('.navigation a').forEach(anchor => { if (anchor.hash === `#${view}`) anchor.setAttribute('aria-current', 'page'); else anchor.removeAttribute('aria-current'); });
   ({ catalogue, comparatif: compareView, budget: budgetView, projet: projectView, carnet: notebook })[view]();
   renderSelection();
@@ -173,6 +260,9 @@ document.addEventListener('click', event => {
   const { action, id } = button.dataset;
   const focusScope = button.closest('dialog') ? dialog : button.closest('#selection') ? document.querySelector('#selection') : main;
   if (action === 'retry') location.reload();
+  if (action === 'project-step') setProjectStep(id);
+  if (action === 'choose') { budgetId = id; budgetChosen = true; saveBudget(); profile.step = 4; save('profile', profile); if (dialog.open) dialog.close(); if (view === 'projet') projectView(); else location.hash = 'projet'; notify('Cette piste est conservée. Les vérifications restent à faire avant tout achat.'); }
+  if (action === 'unchoose') { budgetChosen = false; saveBudget(); projectSummary(); projectShortlist(); }
   if (action === 'detail') detail(id);
   if (action === 'close') dialog.close();
   if (action === 'select') {
@@ -182,17 +272,17 @@ document.addEventListener('click', event => {
     save('selection', selected);
     if (view === 'catalogue') renderProducts();
     if (view === 'comparatif') compareView();
-    if (view === 'projet' && projectResult) projectResults();
+    if (view === 'projet') { projectShortlist(); if (profile.step === 4) projectResults(); }
     document.querySelectorAll(`[data-action="select"][data-id="${id}"]`).forEach(control => { if (control.hasAttribute('aria-pressed')) { control.setAttribute('aria-pressed', selected.includes(id)); control.innerHTML = `${icon(selected.includes(id) ? 'check' : 'plus')}Comparer`; } });
     renderSelection();
   }
   if (action === 'favorite') { favorites = favorites.includes(id) ? favorites.filter(item => item !== id) : [...favorites, id]; save('favorites', favorites); catalogue(); icons(); }
   if (action === 'favorites') { favoritesOnly = !favoritesOnly; catalogue(); icons(); }
   if (action === 'reset') { filters = {}; favoritesOnly = false; catalogue(); icons(); }
-  if (action === 'clear-selection') { selected = []; save('selection', selected); if (view === 'comparatif') compareView(); if (view === 'catalogue') renderProducts(); if (view === 'projet' && projectResult) projectResults(); renderSelection(); }
+  if (action === 'clear-selection') { selected = []; save('selection', selected); if (view === 'comparatif') compareView(); if (view === 'catalogue') renderProducts(); if (view === 'projet') { projectShortlist(); if (profile.step === 4) projectResults(); } renderSelection(); icons(); }
   if (action === 'compare') location.hash = 'comparatif';
-  if (action === 'budget-model') { budgetId = id; saveBudget(); dialog.close(); if (view === 'budget') { budgetView(); icons(); } else location.hash = 'budget'; }
-  if (action === 'clear-local') { for (const key of ['selection', 'favorites', 'budget', 'profile']) { try { localStorage.removeItem(`rivage.${key}`); } catch {} } selected = []; favorites = []; favoritesOnly = false; filters = {}; estimates = {}; owned = []; shippingQuotes = {}; extras = 250; budgetId = 'moken10'; profile = { ...defaultProfile }; projectResult = null; renderSelection(); notify('Les données locales de Rivage ont été effacées.'); }
+  if (action === 'budget-model') { budgetId = id; budgetChosen = true; saveBudget(); dialog.close(); if (view === 'budget') { budgetView(); icons(); } else location.hash = 'budget'; }
+  if (action === 'clear-local') { for (const key of ['selection', 'favorites', 'budget', 'profile']) { try { localStorage.removeItem(`rivage.${key}`); } catch {} } selected = []; favorites = []; favoritesOnly = false; filters = {}; estimates = {}; owned = []; excluded = []; shippingQuotes = {}; extras = 250; budgetId = 'moken10'; budgetChosen = false; profile = { ...defaultProfile }; projectResult = null; if (view === 'projet') projectView(); renderSelection(); notify('Ton projet et tes favoris ont été effacés sur cet appareil.'); }
   if (['select', 'favorite', 'favorites'].includes(action)) {
     const restored = focusScope.querySelector(`[data-action="${action}"]${id ? `[data-id="${id}"]` : ''}`);
     if (restored) restored.focus({ preventScroll: true });
@@ -212,16 +302,17 @@ try {
     const saved = JSON.parse(stored('budget'));
     if (saved && typeof saved === 'object') {
       if (ids.includes(saved.budgetId)) budgetId = saved.budgetId;
+      budgetChosen = saved.budgetChosen === true && ids.includes(saved.budgetId);
       if (Array.isArray(saved.owned)) owned = [...new Set(saved.owned.filter(id => equipment.some(item => item.id === id)))];
+      if (Array.isArray(saved.excluded)) excluded = saved.excluded.filter(id => equipment.some(item => item.id === id && item.optional));
       for (const item of equipment) if (knownNumber(saved.estimates?.[item.id]) && saved.estimates[item.id] >= 0 && saved.estimates[item.id] <= 10000) estimates[item.id] = saved.estimates[item.id];
       for (const id of ids) if (knownNumber(saved.shippingQuotes?.[id]) && saved.shippingQuotes[id] >= 0 && saved.shippingQuotes[id] <= 5000) shippingQuotes[id] = saved.shippingQuotes[id];
       if (knownNumber(saved.extras) && saved.extras >= 0 && saved.extras <= 20000) extras = saved.extras;
     }
+  } catch {}
+  try {
     const savedProfile = JSON.parse(stored('profile'));
-    if (savedProfile && typeof savedProfile === 'object') {
-      for (const key of ['budget', 'maxWeight', 'maxLength', 'bodyWeight', 'gear']) if (knownNumber(savedProfile[key]) && savedProfile[key] >= 0 && savedProfile[key] <= 30000) profile[key] = savedProfile[key];
-      for (const [key, values] of Object.entries({ environment: ['fresh', 'sea'], transport: ['roof', 'trailer', 'nearby'], seats: [1, 2], priority: ['price', 'light', 'reverse'] })) if (values.includes(savedProfile[key])) profile[key] = savedProfile[key];
-    }
+    profile = normalizeProfile(savedProfile?.version === 2 ? savedProfile : null);
   } catch {}
   render();
 } catch (error) {
