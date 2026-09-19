@@ -278,6 +278,10 @@ body:has(#welcome[open]) { overflow: hidden; }
 .chosen-checks li { margin-block: 9px; }
 .budget-table .equipment-group th { background: var(--wash); padding-block: 13px; font-size: 12px; }
 .budget-choice { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-block: 15px; font-size: 13px; }
+.budget-favorites { min-height: 44px; margin-bottom: 8px; }
+.budget-favorites svg { color: var(--aqua); width: 17px; height: 17px; }
+.budget-favorites:has(input:checked) svg { fill: var(--water); }
+.budget-picker .field-hint { margin-top: 10px; }
 .budget-table .optional-switch { display: flex; align-items: center; gap: 7px; margin-top: 8px; font-weight: 400; }
 @media (max-width: 900px) { .project-layout { grid-template-columns: minmax(0, 1fr) 310px; gap: 28px; } .project-questions .form-grid { grid-template-columns: 1fr; } .project-steps { gap: 5px; } }
 @media (max-width: 720px) { .project-layout { display: block; } .project-summary { margin-top: 28px; } .project-questions h2, .project-review h2 { font-size: 26px; } .project-steps { margin-block: 22px; } .project-steps button { font-size: 13px; } .project-questions .form-grid { gap: 20px; } .project-actions { flex-wrap: wrap; } .shortlist-item { gap: 8px; } .shortlist-photo { width: 60px; } .shortlist-actions { flex-direction: column; } .owned-grid { grid-template-columns: 1fr; } }
