@@ -1,6 +1,13 @@
 document.addEventListener('error', event => {
   const image = event.target;
   if (!(image instanceof HTMLImageElement) || !image.dataset.photoLink) return;
+  if (image.closest('.photo-button')) {
+    const placeholder = document.createElement('span');
+    placeholder.className = image.className + ' photo-unavailable';
+    placeholder.textContent = 'Photo indisponible ici · Ouvrir la fiche';
+    image.replaceWith(placeholder);
+    return;
+  }
   const link = document.createElement('a');
   link.className = image.className + ' photo-unavailable';
   link.href = image.dataset.photoLink;
@@ -40,7 +47,7 @@ function photo(model, className = 'photo', lazy = true) { return `<img class="${
 function selectOptions(options, active) { return options.map(([value, label]) => `<option value="${escape(value)}" ${String(value) === String(active) ? 'selected' : ''}>${escape(label)}</option>`).join(''); }
 function selectionButton(model) { const active = selected.includes(model.id); return `<button data-action="select" data-id="${model.id}" aria-pressed="${active}">${icon(active ? 'check' : 'plus')}Comparer</button>`; }
 function productCard(model) {
-  return `<article class="kayak ${selected.includes(model.id) ? 'selected' : ''}" data-model="${model.id}"><div class="photo-top"><span class="status ${model.status}">${statusNames[model.status]}</span><button class="icon heart" data-action="favorite" data-id="${model.id}" aria-label="Favori : ${escape(model.name)}" title="Ajouter ou retirer des favoris" aria-pressed="${favorites.includes(model.id)}">${icon('heart')}</button></div>${photo(model)}<div class="card-content"><div class="card-title"><div><p class="eyebrow">${escape(model.brand)}</p><h3>${escape(model.name)}</h3></div><div class="price">${model.price === null ? 'À vérifier' : money(model.price)}<small>${model.price === null ? 'Prix de variante' : 'TTC · pack relevé'}</small></div></div><p class="version">${escape(model.version)}</p><dl class="specs"><div><dt>Longueur</dt><dd>${number(model.length / 100, 'm')}</dd></div><div><dt>Coque hors siège / drive</dt><dd class="${model.hullWeight === null ? 'unknown' : ''}">${number(model.hullWeight, 'kg')}</dd></div><div><dt>Propulsion</dt><dd>${model.drive === 'fins' ? 'Nageoires' : 'Hélice'}</dd></div></dl></div><div class="card-footer">${selectionButton(model)}<button class="text-button" data-action="detail" data-id="${model.id}">La fiche ${icon('arrow-up-right')}</button></div></article>`;
+  return `<article class="kayak ${selected.includes(model.id) ? 'selected' : ''}" data-model="${model.id}"><div class="photo-top"><span class="status ${model.status}">${statusNames[model.status]}</span><button class="icon heart" data-action="favorite" data-id="${model.id}" aria-label="Favori : ${escape(model.name)}" title="Ajouter ou retirer des favoris" aria-pressed="${favorites.includes(model.id)}">${icon('heart')}</button></div><button type="button" class="photo-button" data-action="detail" data-id="${model.id}" aria-label="Ouvrir la fiche : ${escape(model.brand)} ${escape(model.name)}" aria-haspopup="dialog" aria-controls="detail" title="Ouvrir la fiche">${photo(model)}</button><div class="card-content"><div class="card-title"><div><p class="eyebrow">${escape(model.brand)}</p><h3>${escape(model.name)}</h3></div><div class="price">${model.price === null ? 'À vérifier' : money(model.price)}<small>${model.price === null ? 'Prix de variante' : 'TTC · pack relevé'}</small></div></div><p class="version">${escape(model.version)}</p><dl class="specs"><div><dt>Longueur</dt><dd>${number(model.length / 100, 'm')}</dd></div><div><dt>Coque hors siège / drive</dt><dd class="${model.hullWeight === null ? 'unknown' : ''}">${number(model.hullWeight, 'kg')}</dd></div><div><dt>Propulsion</dt><dd>${model.drive === 'fins' ? 'Nageoires' : 'Hélice'}</dd></div></dl></div><div class="card-footer">${selectionButton(model)}<button class="text-button" data-action="detail" data-id="${model.id}">La fiche ${icon('arrow-up-right')}</button></div></article>`;
 }
 function catalogue() {
   const brands = [...new Set(models.map(model => model.brand))].sort((left, right) => left.localeCompare(right, 'fr'));
