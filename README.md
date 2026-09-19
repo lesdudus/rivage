@@ -6,7 +6,7 @@ Un accompagnement en français pour aider Franck à choisir et équiper un kayak
 
 ## Les kayaks d’abord
 
-Le catalogue est la première vue : 32 références, 11 marques ou marques de distribution, filtres, favoris et comparaison de deux à quatre kayaks. À la première visite, un mot de bienvenue joue sur le nouveau « rayon » de Franck, entre vélo et pêche. De brèves vagues accompagnent le message (aucune animation en mouvement réduit). Le bouton Voir les kayaks, la croix, Échap ou un clic extérieur permettent de commencer sans attendre.
+Le catalogue est la première vue : 32 références, 11 marques ou marques de distribution, filtres, favoris et comparaison de deux à quatre kayaks. À chaque ouverture ou rechargement de la page, un mot de bienvenue joue sur le nouveau « rayon » de Franck, entre vélo et pêche. Il ne revient pas pendant la navigation interne. De brèves vagues accompagnent le message (aucune animation en mouvement réduit). Le bouton Voir les kayaks, la croix, Échap ou un clic extérieur permettent de commencer sans attendre.
 
 La section Pour aller plus loin mène ensuite au projet personnel : quatre courtes étapes sans réponses imposées, puis un bilan des sorties, transport, stockage, confort, charge et enveloppe totale. Chaque réponse peut rester inconnue ou être modifiée. Les conseils sont liés aux réponses, sans chatbot ni profil inventé.
 
@@ -20,7 +20,7 @@ Relevés commerciaux du 18 septembre 2026, pas de prix ni de stock en temps rée
 
 Pas de compte ni de télémétrie ajoutée par Rivage. Les réponses personnelles, favoris, sélection et budget restent dans le navigateur, sans synchronisation entre appareils ou visiteurs. Ils sont modifiables et effaçables depuis le projet ou le carnet. Aucune réponse personnelle n’est incluse dans ce dépôt. Les anciens profils préremplis ne sont pas repris comme des faits sur Franck.
 
-Un simple drapeau local mémorise que le mot de bienvenue a été montré. Il est conservé lors de l’effacement du projet ; un autre navigateur ou la suppression des données du site réaffiche le message. Sans stockage disponible, la visite fonctionne mais ce message peut revenir au chargement suivant.
+Le mot de bienvenue ne dépend pas du stockage : il apparaît une fois à chaque chargement du document, y compris après F5 ou dans un nouvel onglet, mais pas lors des changements de section. L’ancien drapeau local de première visite est ignoré.
 
 GitHub Pages héberge le site ; les photos sont chargées depuis les serveurs des vendeurs ou marques, qui reçoivent donc ces requêtes. Les liens de sources ouvrent des sites externes.
 

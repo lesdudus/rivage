@@ -342,10 +342,7 @@ try {
     profile = normalizeProfile(savedProfile?.version === 2 ? savedProfile : null);
   } catch {}
   render();
-  if (stored('welcomeSeen') !== 'true') {
-    welcome.showModal();
-    save('welcomeSeen', true);
-  }
+  welcome.showModal();
 } catch (error) {
   main.innerHTML = `<div class="empty"><h1>Le catalogue n’a pas pu être ouvert.</h1><p>Vérifiez votre connexion puis réessayez. Le catalogue peut être temporairement indisponible.</p><button data-action="retry">Réessayer</button></div>`;
   console.error(error);
