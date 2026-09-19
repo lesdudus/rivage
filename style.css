@@ -174,6 +174,36 @@ th { font-weight: 600; }
 .sources-list li { padding-bottom: 12px; border-bottom: 1px solid var(--line); }
 dialog { width: min(960px, calc(100% - 32px)); max-height: calc(100dvh - 40px); border: 1px solid var(--line); border-radius: 8px; padding: 0; box-shadow: var(--shadow); color: var(--ink); }
 dialog::backdrop { background: #16352c90; backdrop-filter: blur(3px); }
+#welcome { width: min(520px, calc(100% - 32px)); background: var(--paper); }
+#welcome[open] { animation: welcome-arrive .32s ease-out both; }
+body:has(#welcome[open]) { overflow: hidden; }
+.welcome-close { position: absolute; top: 12px; right: 12px; z-index: 1; background: var(--paper); }
+.welcome-tide { height: 142px; overflow: hidden; background: var(--water); color: var(--aqua); padding-top: 22px; }
+.welcome-passions { display: flex; align-items: center; justify-content: center; gap: 20px; color: var(--forest); }
+.welcome-passions svg { width: 46px; height: 46px; stroke-width: 1.5; }
+.welcome-passions svg:nth-child(2) { width: 18px; height: 18px; }
+.welcome-wave { display: flex; justify-content: center; gap: 12px; margin-top: 18px; animation: welcome-wave .9s ease-in-out 3; }
+.welcome-wave svg { width: 90px; height: 45px; stroke-width: 1.3; }
+.welcome-copy { padding: 28px 32px 32px; }
+.welcome-copy h2 { font-size: 30px; line-height: 1.2; }
+.welcome-copy > p:not(.eyebrow) { margin: 18px 0 24px; font-size: 16px; line-height: 1.65; color: var(--muted); }
+.welcome-copy > button { min-height: 48px; }
+.go-further { display: flex; align-items: center; justify-content: space-between; gap: 24px; border-block: 1px solid var(--line); padding: 28px 0; margin-top: 32px; }
+.go-further h2 { font-size: 25px; }
+.go-further p:not(.eyebrow) { max-width: 560px; color: var(--muted); font-size: 15px; }
+.go-further > a { flex-shrink: 0; }
+@keyframes welcome-arrive { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes welcome-wave { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(14px, -6px); } }
+@media (max-width: 510px) { .welcome-copy { padding: 24px; } .welcome-copy h2 { font-size: 26px; } .welcome-copy > button { width: 100%; } .go-further { align-items: start; flex-direction: column; } }
+@media (max-height: 600px) {
+  .welcome-tide { height: 80px; padding-top: 12px; }
+  .welcome-passions svg { width: 32px; height: 32px; }
+  .welcome-wave { margin-top: 6px; }
+  .welcome-wave svg { height: 24px; }
+  .welcome-copy { padding: 20px; }
+  .welcome-copy h2 { font-size: 24px; }
+  .welcome-copy > p:not(.eyebrow) { font-size: 15px; line-height: 1.5; margin: 12px 0 18px; }
+}
 .dialog-head { position: sticky; top: 0; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 16px 24px; border-bottom: 1px solid var(--line); background: var(--paper); z-index: 2; }
 .dialog-head p { margin: 0; }
 .dialog-body { padding: 24px; }

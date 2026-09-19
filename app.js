@@ -14,6 +14,7 @@ import { matches, budgetFor, recommendation, restore, equipment, knownNumber, em
 
 const main = document.querySelector('#main');
 const dialog = document.querySelector('#detail');
+const welcome = document.querySelector('#welcome');
 const money = value => knownNumber(value) ? new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: Number.isInteger(value) ? 0 : 2 }).format(value) : 'Non renseigné';
 const number = (value, unit = '') => knownNumber(value) ? `${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 }).format(value)}${unit ? ` ${unit}` : ''}` : 'Non renseigné';
 const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
@@ -24,7 +25,7 @@ const yesNo = value => value === true ? 'Oui, annoncé' : value === false ? 'Non
 const link = (url, label) => `<a href="${escape(url)}" target="_blank" rel="noopener noreferrer">${escape(label)} ${icon('arrow-up-right')}</a>`;
 const icons = () => window.lucide?.createIcons();
 let models = [], selected = [], favorites = [], favoritesOnly = false, differences = false;
-let filters = {}, sort = 'price', view = 'projet', budgetId = 'moken10', estimates = {}, owned = [], excluded = [], shippingQuotes = {}, extras = 250, budgetChosen = false;
+let filters = {}, sort = 'price', view = 'catalogue', budgetId = 'moken10', estimates = {}, owned = [], excluded = [], shippingQuotes = {}, extras = 250, budgetChosen = false;
 const defaultProfile = emptyProfile;
 let profile = { ...defaultProfile };
 let projectResult = null, toastTimer;
@@ -52,6 +53,7 @@ function catalogue() {
   document.querySelector('#filters').addEventListener('submit', event => event.preventDefault());
   document.querySelector('#filters').addEventListener('reset', event => { event.preventDefault(); filters = {}; favoritesOnly = false; catalogue(); icons(); });
   document.querySelector('#sort').addEventListener('change', event => { sort = event.target.value; renderProducts(); });
+  main.insertAdjacentHTML('beforeend', `<section class="go-further" aria-labelledby="further-title"><div><p class="eyebrow">À ton rythme</p><h2 id="further-title">Pour aller plus loin</h2><p>Quelques kayaks te plaisent ? Regardons lesquels pourraient vraiment te convenir.</p></div><a class="button-link" href="#projet">${icon('compass')}Préparer ton projet${icon('arrow-right')}</a></section>`);
   renderProducts();
 }
 function renderProducts() {
@@ -246,7 +248,7 @@ function detail(id) {
 function render() {
   const requested = location.hash.slice(1);
   const anchors = ['definitions', 'securite', 'regles', 'achat', 'sources'];
-  view = anchors.includes(requested) ? 'carnet' : ['catalogue', 'comparatif', 'budget', 'projet', 'carnet'].includes(requested) ? requested : 'projet';
+  view = anchors.includes(requested) ? 'carnet' : ['catalogue', 'comparatif', 'budget', 'projet', 'carnet'].includes(requested) ? requested : 'catalogue';
   document.querySelectorAll('.navigation a').forEach(anchor => { if (anchor.hash === `#${view}`) anchor.setAttribute('aria-current', 'page'); else anchor.removeAttribute('aria-current'); });
   ({ catalogue, comparatif: compareView, budget: budgetView, projet: projectView, carnet: notebook })[view]();
   renderSelection();
@@ -260,6 +262,8 @@ document.addEventListener('click', event => {
   const { action, id } = button.dataset;
   const focusScope = button.closest('dialog') ? dialog : button.closest('#selection') ? document.querySelector('#selection') : main;
   if (action === 'retry') location.reload();
+  if (action === 'welcome-close') welcome.close();
+  if (action === 'welcome-browse') { welcome.close(); if (view !== 'catalogue') location.hash = 'catalogue'; }
   if (action === 'project-step') setProjectStep(id);
   if (action === 'choose') { budgetId = id; budgetChosen = true; saveBudget(); profile.step = 4; save('profile', profile); if (dialog.open) dialog.close(); if (view === 'projet') projectView(); else location.hash = 'projet'; notify('Cette piste est conservée. Les vérifications restent à faire avant tout achat.'); }
   if (action === 'unchoose') { budgetChosen = false; saveBudget(); projectSummary(); projectShortlist(); }
@@ -290,6 +294,8 @@ document.addEventListener('click', event => {
   }
 });
 dialog.addEventListener('click', event => { if (event.target === dialog) { const bounds = dialog.getBoundingClientRect(); if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) dialog.close(); } });
+welcome.addEventListener('close', () => main.focus({ preventScroll: true }));
+welcome.addEventListener('click', event => { if (event.target === welcome) { const bounds = welcome.getBoundingClientRect(); if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) welcome.close(); } });
 window.addEventListener('hashchange', render);
 try {
   const response = await fetch('./data.json');
@@ -315,6 +321,10 @@ try {
     profile = normalizeProfile(savedProfile?.version === 2 ? savedProfile : null);
   } catch {}
   render();
+  if (stored('welcomeSeen') !== 'true') {
+    welcome.showModal();
+    save('welcomeSeen', true);
+  }
 } catch (error) {
   main.innerHTML = `<div class="empty"><h1>Le catalogue n’a pas pu être ouvert.</h1><p>Vérifiez votre connexion puis réessayez. Le catalogue peut être temporairement indisponible.</p><button data-action="retry">Réessayer</button></div>`;
   console.error(error);
